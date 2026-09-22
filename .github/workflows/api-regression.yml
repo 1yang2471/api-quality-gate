@@ -1,0 +1,89 @@
+name: api-regression
+
+# 什么时候跑：推送到 main、提 PR、以及手动触发
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支只保留最新一次运行，避免排队堆积（旧的会被取消）
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 门禁一：框架自检 ────────────────────────────────────────────────
+  # 不依赖被测系统，验证"断言层能正确失败""路径登记表没有猜的路径""配置层契约成立"。
+  # 这一层跑得最快，失败说明问题在框架自己身上，和靶子无关。
+  framework-selfcheck:
+    name: 框架自检（不依赖靶子）
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # 自检只验证配置层的契约，不需要真凭据；用明确标注的假值，避免误当真值
+      QAGATE_ENV: ci
+      QAGATE_ADMIN_APP_PASSWORD: selfcheck-admin-not-a-real-secret
+      QAGATE_CUSTOMER_APP_PASSWORD: selfcheck-customer-not-a-real-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: 准备配置文件（真凭据不进仓库，从模板复制）
+        run: cp config/config.yaml.example config/config.yaml
+      - name: 安装依赖
+        run: python -m pip install -r requirements.txt
+      - name: 框架自检
+        run: python -m pytest tests/test_framework_selfcheck.py -v
+      - name: 静态检查
+        run: python -m ruff check .
+
+  # ── 门禁二：真实接口回归 ────────────────────────────────────────────
+  # 拉起真靶子（WooCommerce + MySQL）→ 造数据 → 生成凭据 → 跑全量用例。
+  # 关键约束：靶子不可达用例必须**失败**（skip_when_unreachable=false），
+  # 且整次运行出现任何 skip 都判失败（QAGATE_NO_SKIP=1）——
+  # 否则"容器没起来 → 全部跳过 → 门禁变绿"就是最典型的假绿。
+  api-regression:
+    name: 真实接口回归（拉起靶子）
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: framework-selfcheck
+    env:
+      QAGATE_ENV: ci
+      QAGATE_NO_SKIP: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: 准备配置文件
+        run: cp config/config.yaml.example config/config.yaml
+      - name: 安装依赖
+        run: python -m pip install -r requirements.txt
+      - name: 一键初始化靶子
+        run: python scripts/seed_target.py
+      - name: 注入凭据到本次运行的环境（不落仓库）
+        run: |
+          while IFS='=' read -r key value; do
+            case "$key" in \#*|"") continue;; esac
+            echo "::add-mask::$value"
+            echo "$key=$value" >> "$GITHUB_ENV"
+          done < ci-credentials.env
+      - name: 接口回归（含越权与金额勾稽）
+        run: python -m pytest --alluredir=allure-results
+      - name: 归档测试证据（失败也上传）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: allure-results
+          if-no-files-found: ignore
+      - name: 失败时打印靶子日志
+        if: failure()
+        run: docker compose -f docker/docker-compose.yml logs --tail=200

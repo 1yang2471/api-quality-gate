@@ -1,0 +1,66 @@
+# 被测系统：WooCommerce（WordPress + MySQL）
+#
+# ✅ 已在 Windows 11 + Docker Desktop 4.91.0（引擎 29.8.0）实测通过（2026-09-22）。
+#    实际使用的镜像：mysql:8.0 / wordpress:php8.2-apache / wordpress:cli-php8.2
+#    首次启动拉取镜像约 1.4GB，耗时数分钟。
+#
+# 用法（完整步骤见 docker/README.md）：
+#   docker compose -f docker/docker-compose.yml up -d
+#   等网站初始化完成后，按 README 的 seed 步骤生成 API 密钥
+#
+services:
+  db:
+    image: mysql:8.0
+    container_name: qagate-mysql
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+      MYSQL_ROOT_PASSWORD: rootpass
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - db_data:/var/lib/mysql
+
+  wordpress:
+    image: wordpress:php8.2-apache
+    container_name: qagate-wordpress
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      # 本地环境标记：WordPress 应用密码在非 HTTPS 下的必要条件
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_ENVIRONMENT_TYPE', 'local');
+        define('WP_DEBUG', true);
+    volumes:
+      - wp_data:/var/www/html
+
+  # WP-CLI：用于安装 WooCommerce、导入样例商品、生成 API 密钥
+  wpcli:
+    image: wordpress:cli-php8.2
+    container_name: qagate-wpcli
+    depends_on:
+      - wordpress
+    user: "33:33"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wp_data:/var/www/html
+    entrypoint: ["tail", "-f", "/dev/null"]
+
+volumes:
+  db_data:
+  wp_data:

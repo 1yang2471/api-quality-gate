@@ -1,0 +1,13 @@
+# 接口自动化框架运行依赖（版本下限，实际以本地为准）
+pytest>=8.0
+requests>=2.31
+PyYAML>=6.0
+jsonschema>=4.20
+tenacity>=8.2
+
+# 报告与质量门禁（可选，安装后 pytest 自动启用）
+allure-pytest>=2.13
+pytest-html>=4.1
+
+# 开发期静态检查
+ruff>=0.6

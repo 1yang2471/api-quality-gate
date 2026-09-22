@@ -1,0 +1,59 @@
+# 配置模板（会进仓库的就是这一份，真实密码不进仓库）
+#
+# 用法：
+#   1) 复制成 config/config.yaml
+#        Windows:    copy config\config.yaml.example config\config.yaml
+#        Linux/macOS: cp config/config.yaml.example config/config.yaml
+#   2) 本地：运行 python scripts/seed_target.py，把生成的应用密码填进 credentials
+#      门禁：不需要改文件——QAGATE_ENV=ci 时会从环境变量注入（见下面的 ci 环境）
+env: local
+
+environments:
+  local:
+    # WooCommerce（WordPress）本地站点地址
+    base_url: "http://127.0.0.1:8080"
+    timeout: 15
+    retries: 2
+    # 本地允许"靶子没起来 → 跳过真实用例"，方便先验证框架本身
+    skip_when_unreachable: true
+    # 无需鉴权即可访问的探活端点（WP REST 根）
+    health_path: "/wp-json/"
+
+  ci:
+    base_url: "http://127.0.0.1:8080"
+    timeout: 15
+    retries: 2
+    # 门禁里绝不允许跳过：一旦靶子没起来，用例必须失败，
+    # 否则会出现"41 条全部跳过、CI 依然绿"的假绿（本项目最反对的那种绿）
+    skip_when_unreachable: false
+    health_path: "/wp-json/"
+    # 凭据从环境变量注入，由 scripts/seed_target.py 在 CI 里现场生成
+    credentials:
+      admin:
+        username: "admin"
+        application_password: "${QAGATE_ADMIN_APP_PASSWORD}"
+      customer:
+        username: "customer"
+        application_password: "${QAGATE_CUSTOMER_APP_PASSWORD}"
+
+# ── 鉴权方式说明（实测结论，不是猜测）─────────────────────────────
+# WooCommerce 官方 API 密钥（ck_ / cs_）**只在 HTTPS 下生效**：
+# 源码 includes/class-wc-rest-authentication.php 的 authenticate() 中，
+# 只有 is_ssl() 成立才会走密钥认证，HTTP 下退化为 OAuth 并以匿名身份请求，必然 401。
+# 因此本地与 CI 统一使用 **WordPress 应用密码**（HTTP Basic）：
+#   admin 应用密码   -> GET /wc/v3/products 实测 200
+#   customer 应用密码 -> GET /wc/v3/products 实测 403
+# 完整证据见 docs/测试发现记录.md 的 F-002。
+credentials:
+  admin:
+    username: "admin"
+    application_password: "请替换为 seed_target.py 生成的 admin 应用密码"
+  customer:
+    username: "customer"
+    application_password: "请替换为 seed_target.py 生成的 customer 应用密码"
+
+# 断言阈值
+thresholds:
+  response_time_ms: 3000
+  # 金额比对允许的浮点误差（元）
+  amount_tolerance: 0.02
