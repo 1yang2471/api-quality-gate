@@ -29,8 +29,10 @@ jobs:
       QAGATE_ADMIN_APP_PASSWORD: selfcheck-admin-not-a-real-secret
       QAGATE_CUSTOMER_APP_PASSWORD: selfcheck-customer-not-a-real-secret
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      # 动作版本按"运行时"选：v4/v5 跑在 node20 上（Node 20 已进入弃用），
+      # 下面这几个是各自能清掉弃用告警的最低版本（action.yml 里 using: node24）
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -57,8 +59,8 @@ jobs:
       QAGATE_ENV: ci
       QAGATE_NO_SKIP: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -79,7 +81,7 @@ jobs:
         run: python -m pytest --alluredir=allure-results
       - name: 归档测试证据（失败也上传）
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: allure-results
           path: allure-results
