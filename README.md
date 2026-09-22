@@ -1,5 +1,7 @@
 # 接口自动化质量门禁（api-quality-gate）
 
+[![api-regression](https://github.com/1yang2471/api-quality-gate/actions/workflows/api-regression.yml/badge.svg)](https://github.com/1yang2471/api-quality-gate/actions/workflows/api-regression.yml)
+
 面向 Pytest + Requests 的接口自动化框架，并在其上加一层**测试可信度门禁**：
 不是"跑绿就算通过"，而是持续回答三个问题——
 
