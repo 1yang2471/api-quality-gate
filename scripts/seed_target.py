@@ -65,6 +65,7 @@ class TargetSeeder:
         result = subprocess.run(
             args,
             cwd=ROOT,
+            check=False,  # 退出码在本方法里显式判定，便于拼出可读的错误信息
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -228,7 +229,8 @@ class TargetSeeder:
                 return response.status, response.headers.get("Content-Type", "")
         except urllib.error.HTTPError as exc:  # 401/403 也是有效响应，不是"不可达"
             return exc.code, exc.headers.get("Content-Type", "")
-        except Exception:  # noqa: BLE001 - 探活失败按不可达处理
+        except Exception:
+            # 探活失败一律按"不可达"处理，由调用方判断是否超时
             return 0, ""
 
     def verify(self) -> None:

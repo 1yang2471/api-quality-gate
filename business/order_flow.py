@@ -4,9 +4,9 @@
 用例层只调用这里的方法，不关心底层调了哪些接口、按什么顺序。
 """
 
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Callable
 
 from api.coupon_api import CouponApi
 from api.order_api import OrderApi
@@ -52,7 +52,8 @@ class TestDataTracker:
         for label, action in reversed(self._actions):
             try:
                 action()
-            except Exception as exc:  # noqa: BLE001 - 清理失败不应掩盖用例本身的结论
+            except Exception as exc:
+                # 刻意捕获所有异常：清理失败不应该掩盖用例本身的结论
                 failures.append(f"{label}: {exc}")
                 logger.warning("清理失败 %s: %s", label, exc)
         self._actions.clear()

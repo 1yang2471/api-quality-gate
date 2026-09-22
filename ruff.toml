@@ -1,0 +1,23 @@
+# 静态检查配置
+#
+# 为什么要把规则显式列出来（2026-09-22 的真实教训）：
+#   requirements.txt 里原本写的是 `ruff>=0.6`，于是本地装了 0.15.21、
+#   CI 装了当时的 0.16.8 —— 两个版本的**默认规则集不同**，
+#   结果是"本地全绿、CI 直接红"。静态检查也算门禁，门禁自己必须可复现，
+#   所以：① 版本钉死到 exact；② 检查哪些规则也写死，不依赖工具默认值。
+
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = [
+    "E4",     # pycodestyle：import 位置（E402）
+    "E7",     # pycodestyle：语句层错误
+    "E9",     # pycodestyle：语法/IO 错误
+    "F",      # pyflakes：未定义名、未使用导入
+    "W",      # pycodestyle：警告
+    "I",      # isort：导入顺序
+    "UP",     # pyupgrade：过时写法
+    "B",      # flake8-bugbear：常见陷阱
+    "RUF100", # 失效的 noqa 必须删掉，避免"以为屏蔽了其实没有"
+]
